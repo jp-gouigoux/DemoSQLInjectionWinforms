@@ -6,6 +6,7 @@ using System.Data;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -42,8 +43,16 @@ namespace DemoSQLInjectionWinforms
             }
         }
 
+        Regex patternNom = new Regex(@"^[\w]+$");
+
+        Regex patternPrenom = new Regex(@"^[\w]{1,30}$");
+
         private void button2_Click(object sender, EventArgs e)
         {
+            // Defence In Depth = ceinture, bretelles et parachute
+            if (textBox3.Text.Contains("--") || textBox3.Text.Contains(";") || textBox3.Text.Contains("\"")) throw new ArgumentException();
+            if (!patternNom.IsMatch(textBox3.Text)) throw new ArgumentException();
+
             try
             {
                 listBox1.Items.Clear();
@@ -51,7 +60,14 @@ namespace DemoSQLInjectionWinforms
                 {
                     conn.Open();
                     var commande = conn.CreateCommand();
-                    commande.CommandText = "SELECT nom, prenom, age FROM PERSONNES WHERE nom LIKE '%" + textBox3.Text + "%'";
+
+                    // Contient une injection SQL
+                    //commande.CommandText = "SELECT nom, prenom, age FROM PERSONNES WHERE nom LIKE '%" + textBox3.Text + "%'";
+
+                    // Sécurisé contre l'injection SQL
+                    commande.CommandText = "SELECT nom, prenom, age FROM PERSONNES WHERE nom LIKE @chaine";
+                    commande.Parameters.Add(new SqliteParameter("chaine", textBox3.Text + "%"));
+
                     using (var reader = commande.ExecuteReader())
                     {
                         while (reader.Read())
@@ -69,13 +85,28 @@ namespace DemoSQLInjectionWinforms
 
         private void button1_Click(object sender, EventArgs e)
         {
+            // Defence In Depth = ceinture, bretelles et parachute
+            if (textBox1.Text.Contains("--") || textBox1.Text.Contains(";") || textBox1.Text.Contains("\"")) throw new ArgumentException();
+            if (!patternNom.IsMatch(textBox1.Text)) throw new ArgumentException();
+            if (textBox2.Text.Contains("--") || textBox2.Text.Contains(";") || textBox2.Text.Contains("\"")) throw new ArgumentException();
+            if (!patternPrenom.IsMatch(textBox2.Text)) throw new ArgumentException();
+
             try
             {
                 using (var conn = new SqliteConnection("Data Source=test.db"))
                 {
                     conn.Open();
                     var commande = conn.CreateCommand();
-                    commande.CommandText = "INSERT INTO PERSONNES (nom, prenom, age) VALUES ('" + textBox1.Text + "', '" + textBox2.Text + "', " + numericUpDown1.Value.ToString() + ")";
+
+                    // Contient une injection SQL
+                    //commande.CommandText = "INSERT INTO PERSONNES (nom, prenom, age) VALUES ('" + textBox1.Text + "', '" + textBox2.Text + "', " + numericUpDown1.Value.ToString() + ")";
+
+                    // Sécurisé contre l'injection SQL
+                    commande.CommandText = "INSERT INTO PERSONNES (nom, prenom, age) VALUES (@pNom, @pPrenom, @pAge)";
+                    commande.Parameters.Add(new SqliteParameter("pNom", textBox1.Text));
+                    commande.Parameters.Add(new SqliteParameter("pPrenom", textBox2.Text));
+                    commande.Parameters.Add(new SqliteParameter("pAge", numericUpDown1.Value.ToString()));
+
                     commande.ExecuteNonQuery();
                 }
             }
